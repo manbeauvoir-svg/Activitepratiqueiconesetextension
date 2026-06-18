@@ -676,10 +676,39 @@ body{font-family:Nunito,sans-serif;background:#f4f6fb;color:#1a1a2e;line-height:
 
 <!-- ═══════════════════ BILAN FINAL ═══════════════════ -->
 <div class="screen" id="screen5">
+
+  <!-- SCORE GLOBAL -->
   <div class="final">
     <div class="stars" id="final-stars"></div>
     <div class="result-score final-score" id="final-score"></div>
     <div class="final-msg" id="final-msg"></div>
+  </div>
+
+  <!-- DÉTAIL PAR ACTIVITÉ -->
+  <div style="background:#fff;border-radius:18px;padding:1.4rem;margin-top:1.2rem;box-shadow:0 4px 18px rgba(0,0,0,0.05);">
+    <div style="font-family:'Righteous',cursive;font-size:1rem;color:#0a0a1a;margin-bottom:1rem;">📊 Détail par activité</div>
+    <div id="act-details"></div>
+
+    <!-- MOYENNE GLOBALE -->
+    <div style="border-top:2px solid #e8eaf0;margin-top:1rem;padding-top:1rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.4rem;">
+        <span style="font-weight:900;font-size:0.9rem;color:#1a1a2e;">Moyenne globale</span>
+        <span style="font-family:'Righteous',cursive;font-size:1.1rem;color:#cc0066;" id="avg-pct"></span>
+      </div>
+      <div style="background:#e8eaf0;border-radius:999px;height:14px;overflow:hidden;">
+        <div id="bar-avg" style="height:100%;border-radius:999px;background:linear-gradient(90deg,#ff9933,#cc0066);width:0%;transition:width 1s ease;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CE QU'IL FAUT REVOIR -->
+  <div id="review-box" style="display:none;background:#fff;border-radius:18px;padding:1.4rem;margin-top:1.2rem;box-shadow:0 4px 18px rgba(0,0,0,0.05);border-left:5px solid #ff9933;">
+    <div style="font-family:'Righteous',cursive;font-size:1rem;color:#0a0a1a;margin-bottom:0.8rem;">📖 Points à revoir dans le livret</div>
+    <div id="review-list"></div>
+  </div>
+
+  <div class="btn-row" style="margin-top:1.2rem;">
+    <button class="btn" onclick="goTo(1);" style="background:#fff;color:#0066cc;border:2px solid #0066cc;box-shadow:none;">🔄 Recommencer depuis le début</button>
   </div>
 </div>
 
@@ -915,16 +944,110 @@ document.getElementById('s4-retry').addEventListener('click',function(){
 
 /* ── BILAN FINAL ── */
 function showFinal(){
-  const total=scores.t1+scores.t2+scores.t3+scores.t4;
-  const grand=scores.a1+scores.a2+scores.a3+scores.a4;
-  const pct=grand/total;
-  document.getElementById('final-score').textContent=grand+' / '+total;
-  document.getElementById('final-stars').textContent=pct===1?'⭐⭐⭐':pct>=0.7?'⭐⭐':'⭐';
-  document.getElementById('final-msg').textContent=pct===1
+  const acts=[
+    {
+      sc:scores.a1, tot:scores.t1,
+      label:'Activité 1 — Quiz rapide',
+      acquis:'Notions générales sur les icônes, extensions et PDF maîtrisées.',
+      revoir:'Relisez les définitions des extensions (page 11) et le rôle de chaque icône (page 10).',
+      page:'page 10-11'
+    },
+    {
+      sc:scores.a2, tot:scores.t2,
+      label:'Activité 2 — Reconnaître les icônes',
+      acquis:'Vous distinguez correctement dossiers, fichiers, raccourcis et dossiers compressés.',
+      revoir:'Attention à la flèche du raccourci et à la fermeture éclair du dossier compressé (page 10).',
+      page:'page 10'
+    },
+    {
+      sc:scores.a3, tot:scores.t3,
+      label:'Activité 3 — Attribuer les extensions',
+      acquis:'Vous associez correctement chaque type de fichier à sa bonne extension.',
+      revoir:'Revoyez le tableau des extensions courantes : .docx / .xlsx / .pptx / .pdf / .jpg / .mp4 / .zip (page 11).',
+      page:'page 11'
+    },
+    {
+      sc:scores.a4, tot:scores.t4,
+      label:'Activité 4 — Bureau en désordre',
+      acquis:'Vous savez classer des fichiers dans les bons dossiers selon leur extension.',
+      revoir:'Revoyez les catégories de fichiers : Documents (.docx, .xlsx, .pdf), Images (.jpg, .png), Vidéos (.mp4), Archives (.zip) — page 11.',
+      page:'page 11'
+    }
+  ];
+
+  const grandTotal=scores.t1+scores.t2+scores.t3+scores.t4;
+  const grandScore=scores.a1+scores.a2+scores.a3+scores.a4;
+
+  // Calcul moyenne des pourcentages individuels
+  let sumPct=0;
+  acts.forEach(a=>{ sumPct+=a.tot>0?Math.round((a.sc/a.tot)*100):0; });
+  const moyenne=Math.round(sumPct/acts.length);
+
+  // Score global
+  document.getElementById('final-score').textContent=grandScore+' / '+grandTotal;
+  document.getElementById('final-stars').textContent=moyenne===100?'⭐⭐⭐':moyenne>=70?'⭐⭐':'⭐';
+  document.getElementById('final-msg').textContent=moyenne===100
     ?'Félicitations ! Vous maîtrisez parfaitement les icônes, les extensions et le classement des fichiers.'
-    :pct>=0.7
-    ?'Très bon résultat ! Quelques notions à revoir dans le livret pages 10-11.'
-    :'Continuez à pratiquer et relisez les pages 10 et 11 du livret.';
+    :moyenne>=70
+    ?'Très bon résultat ! Consultez le détail ci-dessous pour identifier les points à consolider.'
+    :'Des notions restent à retravailler. Le détail ci-dessous vous guide vers les bonnes pages du livret.';
+
+  // Détail par activité
+  const detailEl=document.getElementById('act-details');
+  detailEl.innerHTML='';
+  let hasReview=false;
+  const reviewItems=[];
+
+  acts.forEach((a,i)=>{
+    const p=a.tot>0?Math.round((a.sc/a.tot)*100):0;
+    sumPct+=0; // already computed
+    const status=p>=80?{icon:'✅',label:'Acquis',color:'#27500A',bg:'#EAF3DE',border:'#a3c97a'}
+                :p>=60?{icon:'⚠️',label:'À consolider',color:'#7a4f00',bg:'#fff8e1',border:'#ffc107'}
+                      :{icon:'❌',label:'À revoir',color:'#CC0066',bg:'#FBE9E7',border:'#f4a0a0'};
+
+    detailEl.innerHTML+=`
+      <div style="margin-bottom:0.9rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.25rem;flex-wrap:wrap;gap:0.3rem;">
+          <span style="font-weight:800;font-size:0.85rem;color:#444;">${a.label}</span>
+          <span style="display:inline-flex;align-items:center;gap:0.3rem;background:${status.bg};border:1px solid ${status.border};border-radius:999px;padding:0.15rem 0.7rem;font-size:0.75rem;font-weight:900;color:${status.color};">${status.icon} ${status.label} — ${a.sc}/${a.tot} (${p}%)</span>
+        </div>
+        <div style="background:#e8eaf0;border-radius:999px;height:10px;overflow:hidden;margin-bottom:0.4rem;">
+          <div id="bar${i+1}" style="height:100%;border-radius:999px;background:linear-gradient(90deg,#ff9933,#cc0066);width:0%;transition:width 0.8s ${i*0.15}s ease;"></div>
+        </div>
+        <div style="font-size:0.78rem;font-weight:600;color:${status.color};padding:0.3rem 0.5rem;background:${status.bg};border-radius:7px;">${p>=80?'✔ '+a.acquis:'↳ '+a.revoir}</div>
+      </div>`;
+
+    if(p<80){
+      hasReview=true;
+      reviewItems.push(`<div style="display:flex;gap:0.6rem;align-items:flex-start;margin-bottom:0.6rem;padding:0.6rem 0.8rem;background:#fff8f0;border-left:4px solid #ff9933;border-radius:8px;">
+        <span style="font-size:1rem;flex-shrink:0;">${status.icon}</span>
+        <div>
+          <div style="font-weight:800;font-size:0.82rem;color:#1a1a2e;">${a.label} <span style="color:#ff9933;">(${a.page})</span></div>
+          <div style="font-size:0.78rem;color:#666;font-weight:600;margin-top:0.15rem;">${a.revoir}</div>
+        </div>
+      </div>`);
+    }
+  });
+
+  // Animer les barres après rendu
+  setTimeout(()=>{
+    acts.forEach((a,i)=>{
+      const p=a.tot>0?Math.round((a.sc/a.tot)*100):0;
+      const b=document.getElementById('bar'+(i+1));
+      if(b) b.style.width=p+'%';
+    });
+    document.getElementById('bar-avg').style.width=moyenne+'%';
+  },150);
+
+  // Moyenne
+  document.getElementById('avg-pct').textContent=moyenne+' %';
+
+  // Ce qu'il faut revoir
+  if(hasReview){
+    document.getElementById('review-box').style.display='block';
+    document.getElementById('review-list').innerHTML=reviewItems.join('');
+  }
+
   goTo(5);
 }
 </script>
